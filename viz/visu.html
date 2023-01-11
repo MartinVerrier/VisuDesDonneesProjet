@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+	<meta charset="utf-8">
+	<style type="text/css" media="screen, print">
+		body {
+			margin: 30px 50px;
+			font-family: sans-serif;
+		}
+	</style>
+	<title>Gapminder</title>
+</head>
+
+<body>
+	<h1>Gapminder</h1>
+	<h2>Top 20 countries by GDP </h2>
+
+	<script src="../vendor/d3-7.6.1/dist/d3.js"></script>
+	<script>
+
+
+
+		Promise.all(
+			// geo & time attributes ///////////////////////////////////////:
+			[
+				'population_total',
+				'income_per_person_gdppercapita_ppp_inflation_adjusted',
+				'life_expectancy_at_birth_with_projections'
+			].map(name =>
+				d3.csv(`../data/gapminder/ddf--datapoints--${name}--by--geo--time.csv`, d => ({
+					iso3: d.geo,
+					year: +d.time,
+					[name.split('_')[0]]: +d[name],
+				})))
+
+				// country metadata
+				.concat([
+					'country',
+				].map(name =>
+					d3.csv(`../data/gapminder/ddf--entities--geo--${name}.csv`, d => ({
+						iso3: d.country,
+						country_name: d.name,
+						world_4region: d.world_4region,
+					}))))
+				.concat([
+					'world_4region',
+				].map(name =>
+					d3.csv(`../data/gapminder/ddf--entities--geo--${name}.csv`, d => ({
+						world_4region: d.world_4region,
+						region_color: d.color,
+						region_selected: false,
+					}))))
+
+		).then(function (datasets) {
+
+			// data /////////////////////////////////////////////////////////////////
+			console.log(datasets);
+
+			let key = (d) => ([d.iso3, d.year].join('_'));
+			let key2 = (d) => (d.iso3);
+			let key3 = (d) => (d.world_4region);
+
+			let population = datasets[0];
+			let income = d3.index(datasets[1], key);
+			let life = d3.index(datasets[2], key);
+			var year_selected = 2020;
+
+			// build lookup tables from country & world regions
+			let countries = d3.index(datasets[3], key2);
+			let world_4regions = d3.index(datasets[4], key3);
+
+
+			let data = population.map(d => ({
+				...d,
+				...income.get(key(d)),
+				...life.get(key(d)),
+				...countries.get(key2(d))
+			}))
+				.filter(d => 'income' in d)
+				.filter(d => 'life' in d)
+				.map(d => ({
+					...d,
+					...world_4regions.get(key3(d))
+				}));
+
+			// dropdown years
+			let body = d3.select("body");
+			// let dropdown = body.select('h2').append('select');
+			let years = [...new Set(data.map(d => d.year))].sort(d3.descending); // collect the years from data set
+
+
+
+			// console.log(data);
+			// console.log(countries);
+			// console.log(world_4regions);
+
+			var regions_domain = new Set(data.map((d) => d.world_4region));
+			var regions_color_domain = new Set(data.map((d) => d.region_color));
+
+			//Creation de la map permettant de savoir si une région est affichée (true) ou opacifiée (false)
+			var selected_regions = new Map();
+			regions_domain.forEach(element => {
+				selected_regions.set(element, true);
+			});
+
+			//Permet de retrouver le nom d'une région avec sa couleur
+			var returnRegion = d3
+				.scaleOrdinal()
+				.domain(regions_color_domain)
+				.range(regions_domain);
+
+
+
+			// console.log(regions_domain);
+			// console.log(selected_regions);
+			// console.log(regions_color_domain);
+			// console.log(selected_regions.get("asia"));
+			// console.log(returnRegion("#ff5872"));
+
+
+			// build country list for given year
+			let gdp = (d) => d.income * d.population;
+			let country_list = body.append('ol');
+
+
+
+
+			var margin = { top: 30, right: 250, bottom: 100, left: 100 },
+				width = 1200 - margin.left - margin.right,
+				height = 600 - margin.top - margin.bottom;
+
+			var x = d3.scaleLog().range([0, width]);
+			var y = d3.scaleLinear().range([height, 0]);
+
+
+			var s = d3.formatSpecifier("f");
+			s.precision = d3.precisionFixed(0.01);
+			var f = d3.format(s);
+
+			x.domain([200, 200000]);
+			y.domain([10, 90]).nice();
+
+			// Add a scale for bubble size
+			var z = d3.scaleSqrt()
+				.domain([200000, 1310000000])
+				.range([2, 30]);
+
+			//Permet de construire le slider
+			var years_scale = d3.scaleLinear()
+				.domain([d3.min(years), 2023])
+				.range([0, width]);
+
+
+
+			var svg = body
+				.append("svg")
+				.attr("width", width + margin.left + margin.right)
+				.attr("height", height + margin.top + margin.bottom)
+				.append("g")
+				.attr("transform", `translate(${margin.left},${margin.top})`);
+
+
+			//############# YEAR LABEL ###################
+
+
+			var year_label = svg.append("text")
+				.attr("text-anchor", "middle")
+				.attr("dominant-baseline", "middle")
+				.attr("y", height / 2 + margin.top)
+				.attr("x", width / 2 + margin.left - 50)
+				.attr("font-size", 300)
+				.attr("fill", "#eeeeee")
+				.text("2020")
+
+			//#### Ajout des groupes contenant les curseurs ############
+
+			var y_cursor = svg.append("g");
+			var x_cursor = svg.append("g");
+			var c_cursor = svg.append("text");
+
+
+			y_cursor.style("visibility", "hidden");
+			x_cursor.style("visibility", "hidden");
+			c_cursor.style("visibility", "hidden");
+
+
+
+
+			//############# DRAW BUBBLES ###################
+
+			function set_data(year, duration) {
+
+				const t = d3.transition()
+					.duration(duration)
+					.ease(d3.easeLinear);
+
+				var g = svg.selectAll('.bubbles')
+					.data(data.filter((d) => d.year == year))
+					.join('circle')
+					.attr('class', (d) => `bubbles ${d.world_4region}`)
+					.transition(t)
+					.attr('transform', d => `translate(${x(d.income)},${y(d.life)})`)
+					.attr("fill", (d) => d.region_color)
+					.attr("stroke", "black")
+					.attr('r', (d) => z(d.population));
+			}
+
+
+
+			//############# AXE X ###################
+
+			var xAxis = d3.axisBottom(x);
+			svg
+				.append("g")
+				.attr("transform", `translate(0,${y(10)})`)
+				.call(xAxis.ticks(20 / 5).tickSize(10));
+			svg
+				.append("g")
+				.attr("transform", `translate(0,${y(10)})`)
+				.call(xAxis.ticks(20 / 5).tickSize(-height))
+				.attr("opacity", 0.2)
+				.selectAll("text").remove();
+
+			// Add X axis label:
+			svg.append("text")
+				.attr("text-anchor", "end")
+				.attr("x", width)
+				.attr("y", height + margin.bottom - 50)
+				.attr("font-size", 13)
+				.text("income per person");
+
+
+
+			//############# AXE Y ###################
+
+			var yAxis = d3.axisLeft(y);
+			svg
+				.append("g")
+				.attr("transform", `translate(${x(200)})`)
+				.call(yAxis.ticks(13 / 5).tickSize(10))
+			svg
+				.append("g")
+				.attr("transform", `translate(${x(200)})`)
+				.call(yAxis.ticks(13 / 5).tickSize(-width))
+				.attr("opacity", 0.2)
+				.selectAll("text").remove();
+
+			// Y axis label:
+			svg.append("text")
+				.attr("text-anchor", "end")
+				.attr("transform", "rotate(-90)")
+				.attr("y", -margin.left + 20)
+				.attr("x", -margin.top)
+				.attr("font-size", 13)
+				.text("life expectancy")
+
+
+			//############################ CURSORS  #############################
+
+
+			y_cursor.append("line")
+				.style("stroke", "black")  // colour the line
+				.style("stroke-dasharray", ("3, 3"))
+				.attr("x1", -15);
+
+
+			x_cursor.append("line")          // attach a line
+				.style("stroke", "black")  // colour the line
+				.style("stroke-dasharray", ("3, 3"))
+				.attr("y2", height + 25);
+
+
+			y_cursor.append("text")
+				.attr("text-anchor", "middle")
+				.attr("font-size", 12);
+
+			x_cursor.append("text")
+				.attr("text-anchor", "middle")
+				.attr("font-size", 12);
+
+			c_cursor.append("text")
+				.attr("text-anchor", 'middle')
+				.attr("dominant-baseline", 'middle')
+				.attr("x", 200)
+				.attr("y", 150)
+				.attr("font-size", 18)
+				.attr('fill', 'black')
+				.text("");
+
+
+			//#################### FUNCTION TO CHANGE THE YEAR (setyear)########################
+
+			function set_year(year, duration) {
+				year_selected = year;
+				year_label.text(year);
+				console.log(year);
+
+				set_data(year, duration);
+				svg.selectAll(".pointer").attr("transform", `translate(${years_scale(year)},0)`);
+			}
+
+
+
+			//####################### SLIDER #################################
+
+
+
+
+			var yearsAxis = d3.axisBottom(years_scale);
+			svg.append('g')
+				.attr('transform', `translate(0,${height + margin.bottom - 20})`)
+				.call(yearsAxis);
+
+
+			//Definition of the pointer on the year scale
+			var pointer = svg.append("g");
+			pointer.attr("transform", `translate(0, ${height + margin.bottom - 20})`);
+			pointer.append("circle")
+				.attr("x", `${years_scale(2020)}`)
+				.attr("r", 5)
+				.attr("fill", "grey")
+				.attr("stroke", "black")
+				.attr("class", 'pointer')
+				.style("cursor", "pointer");
+
+
+			svg.selectAll(".pointer").call(d3.drag().on("drag", (e) => {
+				if (Math.round(years_scale.invert(e.x)) >= 1800 && Math.round(years_scale.invert(e.x)) < 2023) {
+					let new_year = Math.round(years_scale.invert(e.x));
+					// console.log(new_year);
+					set_year(new_year, 0);
+					playing = false;
+				}
+			}));
+
+			//####################### ANIMATION BUTTON PLAYPAUSE ON SLIDER #################################
+
+			//Set to true if the animation is activated
+			var playing = false;
+
+			svg.append("circle")
+				.attr("class", "playpause")
+				.attr("cx", -40)
+				.attr("cy", height + margin.bottom - 20)
+				.attr("r", 20)
+				.attr("stroke", "black")
+				.attr("fill", "white")
+				.style("cursor", "pointer");
+
+
+			var play = svg.append("text")
+				.attr("class", "playpause")
+				.attr("x", -40)
+				.attr("y", height + margin.bottom - 20)
+				.attr("font-size", 14)
+				.attr("text-anchor", "middle")
+				.attr("dominant-baseline", "middle")
+				.style("cursor", "pointer")
+				.text('▶');
+
+			d3.selectAll(".playpause").on("click", function (d) {
+				playing = !playing;
+
+				if (playing) {
+					play.text("❙❙");
+					step_year();
+				}
+				else {
+					play.text("▶");
+				}
+			});
+
+			function step_year() {
+				const t = d3.interval((elapsed) => {
+					year_selected = year_selected + 1;
+					if (year_selected >= 2023) year_selected = 1800;
+
+					svg.selectAll(".pointer").attr("transform", `translate(${years_scale(year_selected)},0)`);
+					set_year(year_selected, 120);
+					// console.log("Animation playing");
+					if (!playing) {
+						play.text("▶");
+						t.stop();
+					}
+				}, 120);
+			}
+
+
+			//####################### LEGEND #################################
+
+
+			var regions_legend = svg
+				.selectAll(".regions")
+				.data(regions_domain)
+				.enter()
+				.append("g")
+				.attr("class", "regions")
+				.attr(
+					"transform",
+					(d, i) => `translate(${width + 90}, ${i * 35 + 50})`
+				);
+
+			regions_legend.append("text").text((d) => d)
+				.attr("font-size", 18)
+				.on("click", function (e, d) {
+					if (selected_regions.get(d) == true) {
+						selected_regions.set(d, false);
+						d3.selectAll(`.${d}`)
+							.attr("opacity", 0.1);
+					} else {
+						selected_regions.set(d, true);
+						d3.selectAll(`.${d}`)
+							.attr("opacity", 1);
+					}
+				})
+				.style("cursor", "pointer");
+
+
+			var regions_colors_legend = svg
+				.selectAll(".colors_years")
+				.data(regions_color_domain)
+				.enter()
+				.append("circle")
+				.attr("r", 10)
+				.attr("class", (d) => `regions_colors ${returnRegion(d)}`)
+				.attr(
+					"transform",
+					(d, i) => `translate(${width + 65}, ${i * 35 + 47})`
+				)
+				.attr("fill", (d) => d)
+				.attr("stroke", "black")
+				.on("click", function (e, d) {
+					d = returnRegion(d);
+					if (selected_regions.get(d) == true) {
+						selected_regions.set(d, false);
+						d3.selectAll(`.${d}`)
+							.attr("opacity", 0.1);
+					} else {
+						selected_regions.set(d, true);
+						d3.selectAll(`.${d}`)
+							.attr("opacity", 1);
+					}
+				})
+				.style("cursor", "pointer");
+
+
+
+			//############# UPDATE CURSORS AND COLORS ON MOUSE HOVERING ###################
+
+
+			set_year(2020, 0);
+
+
+			d3.selectAll(".bubbles")
+				.on("mouseover", function (e, d) {
+					d3.select(this)
+						.attr("fill", "orange");
+
+					console.log(this);
+					// console.log(d);
+
+
+					y_cursor.select("line")
+						.attr("x2", `${x(d.income)}`)
+						.attr("y1", `${y(d.life)}`)
+						.attr("y2", `${y(d.life)}`);
+					x_cursor.select("line")
+						.attr("y1", `${y(d.life)}`)
+						.attr("x1", `${x(d.income)}`)
+						.attr("x2", `${x(d.income)}`);
+
+					y_cursor.select("text")
+						.attr("x", -25)
+						.attr("y", `${y(d.life) + 5}`)
+						.text(d.life);
+
+					x_cursor.select("text")
+						.attr("x", `${x(d.income)}`)
+						.attr("y", height + 35)
+						.text(d.income);
+
+					c_cursor
+						.text(`${d.country_name}`);
+
+					x_cursor.style("visibility", "visible");
+					y_cursor.style("visibility", "visible");
+					c_cursor.style("visibility", "visible");
+
+				})
+				.on("mouseout", function () {
+					d3.select(this)
+						.attr("fill", (d) => d.region_color)
+					// .attr("fill", "blue");
+
+					x_cursor.style("visibility", "hidden");
+					y_cursor.style("visibility", "hidden");
+					c_cursor.style("visibility", "hidden");
+				});
+
+
+
+		});
+	</script>
+</body>
+
+</html>

@@ -1,0 +1,2 @@
+AddType 'text/plain; charset=utf-8' csv
+AddType 'text/plain; charset=utf-8' md
