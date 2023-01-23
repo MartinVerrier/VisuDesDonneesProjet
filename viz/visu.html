@@ -13,7 +13,7 @@
 </head>
 
 <body>
-	<h1>Gapminder</h1>
+	<h1>Income inequalities</h1>
 	<h2>Top 20 countries by GDP </h2>
 
 	<script src="../vendor/d3-7.6.1/dist/d3.js"></script>
@@ -21,68 +21,98 @@
 
 
 
-		Promise.all(
-			// geo & time attributes ///////////////////////////////////////:
-			[
-				'population_total',
-				'income_per_person_gdppercapita_ppp_inflation_adjusted',
-				'life_expectancy_at_birth_with_projections'
-			].map(name =>
-				d3.csv(`../data/gapminder/ddf--datapoints--${name}--by--geo--time.csv`, d => ({
-					iso3: d.geo,
-					year: +d.time,
-					[name.split('_')[0]]: +d[name],
-				})))
+		Promise.all([
 
-				// country metadata
-				.concat([
-					'country',
-				].map(name =>
-					d3.csv(`../data/gapminder/ddf--entities--geo--${name}.csv`, d => ({
-						iso3: d.country,
-						country_name: d.name,
-						world_4region: d.world_4region,
-					}))))
-				.concat([
-					'world_4region',
-				].map(name =>
-					d3.csv(`../data/gapminder/ddf--entities--geo--${name}.csv`, d => ({
-						world_4region: d.world_4region,
-						region_color: d.color,
-						region_selected: false,
-					}))))
 
-		).then(function (datasets) {
+			//Load population data from gapminder
+			d3.csv(`../data/gapminder/ddf--datapoints--population_total--by--geo--time.csv`, d => ({
+				iso3: d.geo,
+				year: +d.time,
+				population: +d.population_total,
+			})),
 
-			// data /////////////////////////////////////////////////////////////////
+			//Load income averages
+			d3.tsv(`../data/income_averages.tsv`, d => ({
+				alpha2: d.country,
+				year: +d.year,
+				income: +d.average
+			})),
+
+			//Load gini index
+			d3.tsv(`../data/income_gini.tsv`, d => ({
+				alpha2: d.country,
+				year: +d.year,
+				gini: +d.gini_index
+			})),
+
+			//Load country codes
+			d3.csv(`../data/gapminder/ddf--entities--geo--country.csv`, d => ({
+				alpha2: d.iso3166_1_alpha2,
+				iso3: d.country,
+				country_name: d.name,
+				world_4region: d.world_4region
+			})),
+
+			//Load world 4 regions and colors
+			d3.csv(`../data/gapminder/ddf--entities--geo--world_4region.csv`, d => ({
+				world_4region: d.world_4region,
+				region_color: d.color
+			}))
+
+
+		]).then(function (datasets) {
+
+
 			console.log(datasets);
 
-			let key = (d) => ([d.iso3, d.year].join('_'));
-			let key2 = (d) => (d.iso3);
-			let key3 = (d) => (d.world_4region);
 
-			let population = datasets[0];
-			let income = d3.index(datasets[1], key);
-			let life = d3.index(datasets[2], key);
+			// ####   dataset[0] ==> population data from gapminder  #####
+			// ####   dataset[1] ==> income averages                 #####     
+			// ####   dataset[2] ==> gini index                      ##### 
+			// ####   dataset[3] ==> country codes                   #####     
+			// ####   dataset[4] ==> world 4 regions and colors      #####       
+
+			//Création de clés pour l'indexation des données
+			let key_a2_year = (d) => ([d.alpha2, d.year].join('_'));
+			let key_iso3_year = (d) => ([d.iso3, d.year].join('_'));
+
+
+			let income = datasets[1];
+			let countries = datasets[3];
+
+			//On indexe les données pour un chargement plus rapide
+			let gini = d3.index(datasets[2], key_a2_year);
+			let population = d3.index(datasets[0], key_iso3_year);
+			let world_4regions = d3.index(datasets[4], (d) => (d.world_4region));
+
 			var year_selected = 2020;
 
-			// build lookup tables from country & world regions
-			let countries = d3.index(datasets[3], key2);
-			let world_4regions = d3.index(datasets[4], key3);
+
+			//Création de notre objet data contenant toutes les informations
+			var data = income.map(function (row) {
+				var newRow = row;
+
+				//Pour chaque ligne (alpha2, year) de income, on rajoute l'indice gini si il existe
+				Object.assign(newRow, gini.get(key_a2_year(newRow)));
 
 
-			let data = population.map(d => ({
-				...d,
-				...income.get(key(d)),
-				...life.get(key(d)),
-				...countries.get(key2(d))
-			}))
-				.filter(d => 'income' in d)
-				.filter(d => 'life' in d)
-				.map(d => ({
-					...d,
-					...world_4regions.get(key3(d))
-				}));
+				//Pour chaque ligne, on ajoute ensuite les informations sur le pays
+				countries.forEach(r => {
+					if (newRow.alpha2 == r.alpha2) {
+						Object.assign(newRow, r);
+					}
+				});
+
+				//Enfin, grace à l'étape précédente, on ajoute les informations sur la population et la région.
+				Object.assign(newRow, population.get(key_iso3_year(newRow)));
+				Object.assign(newRow, world_4regions.get(row.world_4region));
+
+				return newRow;
+			});
+
+			console.log(data);
+
+
 
 			// dropdown years
 			let body = d3.select("body");
@@ -90,19 +120,16 @@
 			let years = [...new Set(data.map(d => d.year))].sort(d3.descending); // collect the years from data set
 
 
-
-			// console.log(data);
-			// console.log(countries);
-			// console.log(world_4regions);
-
-			var regions_domain = new Set(data.map((d) => d.world_4region));
-			var regions_color_domain = new Set(data.map((d) => d.region_color));
+			var regions_domain = new Set(datasets[4].map((d) => d.world_4region));
+			var regions_color_domain = new Set(datasets[4].map((d) => d.region_color));
 
 			//Creation de la map permettant de savoir si une région est affichée (true) ou opacifiée (false)
 			var selected_regions = new Map();
 			regions_domain.forEach(element => {
 				selected_regions.set(element, true);
 			});
+
+
 
 			//Permet de retrouver le nom d'une région avec sa couleur
 			var returnRegion = d3
@@ -112,11 +139,11 @@
 
 
 
-			// console.log(regions_domain);
-			// console.log(selected_regions);
-			// console.log(regions_color_domain);
-			// console.log(selected_regions.get("asia"));
-			// console.log(returnRegion("#ff5872"));
+			console.log(regions_domain);
+			console.log(selected_regions);
+			console.log(regions_color_domain);
+			console.log(selected_regions.get("asia"));
+			console.log(returnRegion("#ff5872"));
 
 
 			// build country list for given year
@@ -497,8 +524,8 @@
 					y_cursor.style("visibility", "hidden");
 					c_cursor.style("visibility", "hidden");
 				});
-
-
+			
+			
 
 		});
 	</script>
