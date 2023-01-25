@@ -14,7 +14,6 @@
 
 <body>
 	<h1>Income inequalities</h1>
-	<!-- <h2>Top 20 countries by GDP </h2> -->
 
 	<script src="../vendor/d3-7.6.1/dist/d3.js"></script>
 	<script>
@@ -32,7 +31,7 @@
 			})),
 
 			//Load income averages
-			d3.tsv(`../data/income_averages.tsv`, d => ({
+			d3.tsv(`../data/new_income_averages.tsv`, d => ({
 				alpha2: d.country,
 				year: +d.year,
 				income: +d.average
@@ -147,13 +146,6 @@
 			console.log(returnRegion("#ff5872"));
 
 
-			// build country list for given year
-			let gdp = (d) => d.income * d.population;
-			let country_list = body.append('ol');
-
-
-
-
 			var margin = { top: 30, right: 250, bottom: 100, left: 100 },
 				width = 1200 - margin.left - margin.right,
 				height = 600 - margin.top - margin.bottom;
@@ -236,7 +228,7 @@
 					.attr('transform', d => `translate(${x(d.population)},${y(d.gini)})`)
 					.attr("fill", (d) => d.region_color)
 					.attr("stroke", "black")
-					.attr('r', (d) => z(d.income));
+					.attr('r', (d) => 2*z(d.income));
 			}
 
 

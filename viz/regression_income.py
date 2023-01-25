@@ -41,29 +41,29 @@ print("MSE : ", mean_squared_error(y_test, y_pred))
 # Calcul de RMSE
 print("RMSE : ", np.sqrt(mean_squared_error(y_test, y_pred)))
 
-# 1914 - 2017
+# # 1914 - 2017
 
-# Créez un dataframe vide pour stocker les nouvelles données
-new_data = pd.DataFrame(columns=["country", "year", "average", "is_estimate"])
+# # Créez un dataframe vide pour stocker les nouvelles données
+# new_data = pd.DataFrame(columns=["country", "year", "average", "is_estimate"])
 
-# Bouclez sur chaque pays
-for country in data["country"].unique():
-    # Bouclez sur chaque année entre 1914 et 2017
-    for year in range(1914, 2018):
-        # Vérifiez si l'année et le pays existent déjà dans les données
-        if data.query("year == @year and country == @country").empty == True :
-            # Utilisez le modèle pour prédire la valeur de l'indice Gini pour cette année et ce pays
-            new_data_temp = pd.DataFrame({'country': [country], 'year': [year]})
-            encoded_new_data = encoder.transform(new_data_temp[["country", "year"]])
-            gini_pred = reg.predict(encoded_new_data)[0]
-            # Ajoutez les données prédites à new_data
-            new_data = new_data.append(pd.DataFrame({"country": country, "year": year, "average": gini_pred, "is_estimate": True}, index=[0]), ignore_index=False)
+# # Bouclez sur chaque pays
+# for country in data["country"].unique():
+#     # Bouclez sur chaque année entre 1914 et 2017
+#     for year in range(1914, 2018):
+#         # Vérifiez si l'année et le pays existent déjà dans les données
+#         if data.query("year == @year and country == @country").empty == True :
+#             # Utilisez le modèle pour prédire la valeur de l'indice Gini pour cette année et ce pays
+#             new_data_temp = pd.DataFrame({'country': [country], 'year': [year]})
+#             encoded_new_data = encoder.transform(new_data_temp[["country", "year"]])
+#             gini_pred = reg.predict(encoded_new_data)[0]
+#             # Ajoutez les données prédites à new_data
+#             new_data = new_data.append(pd.DataFrame({"country": country, "year": year, "average": gini_pred, "is_estimate": True}, index=[0]), ignore_index=False)
 
-# Concatenez les nouvelles données avec les anciennes
-data = pd.concat([data, new_data], axis=0)
+# # Concatenez les nouvelles données avec les anciennes
+# data = pd.concat([data, new_data], axis=0)
 
-# Triez les données par pays et par date
-data = data.sort_values(by=['country', 'year'], ascending=[True, False])
+# # Triez les données par pays et par date
+# data = data.sort_values(by=['country', 'year'], ascending=[True, False])
 
-# Enregistrez les données mises à jour dans un nouveau fichier
-data.to_csv("/home/martin/Bureau/Cours/INFO5/VisuDonnées/Projet/VisuDesDonneesProjet/data/new_income_averages.tsv", sep='\t')
+# # Enregistrez les données mises à jour dans un nouveau fichier
+# data.to_csv("/home/martin/Bureau/Cours/INFO5/VisuDonnées/Projet/VisuDesDonneesProjet/data/new_income_averages.tsv", sep='\t')
