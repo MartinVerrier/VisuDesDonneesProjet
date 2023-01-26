@@ -9,7 +9,7 @@
 			font-family: sans-serif;
 		}
 	</style>
-	<title>Gapminder</title>
+	<title>Income inequalities</title>
 </head>
 
 <body>
@@ -86,8 +86,8 @@
 			let gini = d3.index(datasets[2], key_a2_year);
 			let population = d3.index(datasets[0], key_iso3_year);
 			let world_4regions = d3.index(datasets[4], (d) => (d.world_4region));
-			
-			
+
+
 			//Création de notre objet data contenant toutes les informations
 			var data = income.map(function (row) {
 				var newRow = row;
@@ -112,20 +112,20 @@
 				.filter(d => 'population' in d);
 
 			console.log(data);
-			
-			
-			
+
+
+
 			// dropdown years
 			let body = d3.select("body");
 			// let dropdown = body.select('h2').append('select');
 			let years = [...new Set(data.map(d => d.year))].sort(d3.descending); // collect the years from data set
-			
+
 			let min_years = d3.min(years);
 			let max_years = d3.max(years);
 			var year_selected = 2012;
 
-			
-			var income_domain = new Set(income.map((d) => Math.round(d.income)));
+
+			var income_domain = new Set(data.map((d) => Math.round(d.income)));
 			var regions_domain = new Set(datasets[4].map((d) => d.world_4region));
 			var regions_color_domain = new Set(datasets[4].map((d) => d.region_color));
 
@@ -144,7 +144,8 @@
 				.range(regions_domain);
 
 
-
+			console.log(d3.max(income_domain));
+			console.log(d3.min(income_domain));
 			console.log(regions_domain);
 			console.log(selected_regions);
 			console.log(regions_color_domain);
@@ -175,7 +176,7 @@
 			// Average Income (bubble size)
 			var z = d3.scaleSqrt()
 				.domain([d3.min(income_domain), d3.max(income_domain)])
-				.range([3, 30]);
+				.range([3, 25]);
 
 			//Permet de construire le slider
 			var years_scale = d3.scaleLinear()
@@ -204,11 +205,59 @@
 				.attr("fill", "#eeeeee")
 				.text("2020")
 
+			//############# AXE X ###################
+
+			var xAxis = d3.axisBottom(x);
+			svg
+				.append("g")
+				.attr("transform", `translate(0,${y(0)})`)
+				.call(xAxis.ticks(5).tickSize(10));
+			svg
+				.append("g")
+				.attr("transform", `translate(0,${y(0)})`)
+				.call(xAxis.ticks(5).tickSize(-height))
+				.attr("opacity", 0.1)
+				.selectAll("text").remove();
+
+			// Add X axis label:
+			svg.append("text")
+				.attr("text-anchor", "end")
+				.attr("x", width)
+				.attr("y", height + margin.bottom - 50)
+				.attr("font-size", 13)
+				.text("population");
+
+
+
+			//############# AXE Y ###################
+
+			var yAxis = d3.axisLeft(y);
+			svg
+				.append("g")
+				// .attr("transform", `translate(${x(200)})`)
+				.call(yAxis.ticks(5).tickSize(10))
+			svg
+				.append("g")
+				// .attr("transform", `translate(${x(200)})`)
+				.call(yAxis.ticks(5).tickSize(-width))
+				.attr("opacity", 0.1)
+				.selectAll("text").remove();
+
+			// Y axis label:
+			svg.append("text")
+				.attr("text-anchor", "end")
+				.attr("transform", "rotate(-90)")
+				.attr("y", -margin.left + 20)
+				.attr("x", -margin.top)
+				.attr("font-size", 13)
+				.text("gini index")
+
+
 			//#### Ajout des groupes contenant les curseurs ############
 
 			var y_cursor = svg.append("g");
 			var x_cursor = svg.append("g");
-			var c_cursor = svg.append("text");
+			var c_cursor = svg.append("g");
 
 
 			y_cursor.style("visibility", "hidden");
@@ -233,64 +282,14 @@
 					.transition(t)
 					.attr('transform', d => `translate(${x(d.population)},${y(d.gini)})`)
 					.attr("fill", (d) => d.region_color)
+					.attr('r', (d) => z(d.income))
+					.attr('opacity', (d) => { return (d.is_estimate_gini == "True") ? 0.5 : 1 })
 					.attr("stroke", "black")
-					.attr('r', (d) => 2*z(d.income))
-					.attr('opacity', (d) => {
-						if (d.is_estimate_gini == "True" || d.is_estimate_income == "True")
-							return 0.3;
-						else
-							return 1.0;
-					});
+					.style('stroke-dasharray', (d) => { return (d.is_estimate_income == "True") ? "5,3" : "0" });
 			}
 
 
 
-			//############# AXE X ###################
-
-			var xAxis = d3.axisBottom(x);
-			svg
-				.append("g")
-				.attr("transform", `translate(0,${y(0)})`)
-				.call(xAxis.ticks(20 / 5).tickSize(10));
-			svg
-				.append("g")
-				.attr("transform", `translate(0,${y(0)})`)
-				.call(xAxis.ticks(20 / 5).tickSize(-height))
-				.attr("opacity", 0.2)
-				.selectAll("text").remove();
-
-			// Add X axis label:
-			svg.append("text")
-				.attr("text-anchor", "end")
-				.attr("x", width)
-				.attr("y", height + margin.bottom - 50)
-				.attr("font-size", 13)
-				.text("population");
-
-
-
-			//############# AXE Y ###################
-
-			var yAxis = d3.axisLeft(y);
-			svg
-				.append("g")
-				// .attr("transform", `translate(${x(200)})`)
-				.call(yAxis.ticks(13 / 5).tickSize(10))
-			svg
-				.append("g")
-				// .attr("transform", `translate(${x(200)})`)
-				.call(yAxis.ticks(13 / 5).tickSize(-width))
-				.attr("opacity", 0.2)
-				.selectAll("text").remove();
-
-			// Y axis label:
-			svg.append("text")
-				.attr("text-anchor", "end")
-				.attr("transform", "rotate(-90)")
-				.attr("y", -margin.left + 20)
-				.attr("x", -margin.top)
-				.attr("font-size", 13)
-				.text("gini index")
 
 
 			//############################ CURSORS  #############################
@@ -316,14 +315,21 @@
 				.attr("text-anchor", "middle")
 				.attr("font-size", 12);
 
-			c_cursor.append("text")
-				.attr("text-anchor", 'middle')
+			c_cursor.append("rect")
 				.attr("dominant-baseline", 'middle')
-				.attr("x", 200)
-				.attr("y", 150)
-				.attr("font-size", 18)
+				.attr("fill", "white")
+				.attr("stroke", "black")
+				.attr("rx", 5)
+				.attr("ry", 5);
+
+			c_cursor.append("text")
+				.attr("dominant-baseline", 'middle')
+				.attr("font-size", 14)
 				.attr('fill', 'black')
 				.text("");
+
+			var bbox = c_cursor.node().getBBox();
+
 
 
 			//#################### FUNCTION TO CHANGE THE YEAR (setyear)########################
@@ -426,6 +432,7 @@
 
 			//####################### LEGEND #################################
 
+			//COLOR LEGEND : REGIONS
 
 			var regions_legend = svg
 				.selectAll(".regions")
@@ -437,6 +444,13 @@
 					"transform",
 					(d, i) => `translate(${width + 90}, ${i * 35 + 50})`
 				);
+
+			svg.append("text")
+				.text("Regions")
+				.attr("font-size", 20)
+				.attr("font-weight", 800)
+				.attr("transform", `translate(${width + 50}, 10)`);
+
 
 			regions_legend.append("text").text((d) => d)
 				.attr("font-size", 18)
@@ -474,7 +488,8 @@
 						d3.selectAll(`.${d}`)
 							.style("visibility", "hidden");
 						d3.selectAll(`.regions_colors`)
-							.style("visibility", "visible");
+							.style("visibility", "visible")
+							.attr("opacity", 0.5);
 					} else {
 						selected_regions.set(d, true);
 						d3.selectAll(`.${d}`)
@@ -483,6 +498,152 @@
 				})
 				.style("cursor", "pointer");
 
+
+			// Z LENGEND : INCOME AVERAGES
+
+			let r1 = z(10000);
+			let r2 = z(5000000);
+			let r3 = z(50000000);
+			let z_legend_height = 300;
+			let z_legend_width = 130;
+
+			var z_legend = svg.append("g");
+
+			z_legend.append("text")
+				.text("Income average")
+				.attr("font-size", 20)
+				.attr("font-weight", 800)
+				.attr("transform", `translate(${width + 50}, ${z_legend_height - 90})`);
+
+			z_legend.append("circle")
+				.attr("cx", width + z_legend_width)
+				.attr("cy", z_legend_height - r1)
+				.attr("r", r1)
+				.attr('class', "popu")
+				.attr('fill', 'none')
+				.attr('stroke', 'black');
+
+			z_legend.append("circle")
+				.attr("cx", width + z_legend_width)
+				.attr("cy", z_legend_height - r2)
+				.attr("r", r2)
+				.attr('class', "popu")
+				.attr('fill', 'none')
+				.attr('stroke', 'black');
+
+
+			z_legend.append("circle")
+				.attr("cx", width + z_legend_width)
+				.attr("cy", z_legend_height - r3)
+				.attr("r", r3)
+				.attr('class', "popu")
+				.attr('fill', 'none')
+				.attr('stroke', 'black');
+
+
+			z_legend.append("g")
+				.append("line")
+				.attr("x1", width + z_legend_width)
+				.attr("x2", width + z_legend_width - 40)
+				.attr("y1", z_legend_height - r1 * 2)
+				.attr("y2", z_legend_height - r1 * 2)
+				.attr("stroke", "black");
+
+			z_legend.append("g")
+				.append("line")
+				.attr("x1", width + z_legend_width)
+				.attr("x2", width + z_legend_width - 40)
+				.attr("y1", z_legend_height - r2 * 2)
+				.attr("y2", z_legend_height - r2 * 2)
+				.attr("stroke", "black");
+
+			z_legend.append("g")
+				.append("line")
+				.attr("x1", width + z_legend_width)
+				.attr("x2", width + z_legend_width - 40)
+				.attr("y1", z_legend_height - r3 * 2)
+				.attr("y2", z_legend_height - r3 * 2)
+				.attr("stroke", "black");
+
+			z_legend.append("text")
+				.attr("x", width + z_legend_width - 80)
+				.attr("y", z_legend_height - r1 * 2)
+				.text("10k")
+				.attr("dominant-baseline", "middle");
+
+			z_legend.append("text")
+				.attr("x", width + z_legend_width - 80)
+				.attr("y", z_legend_height - r2 * 2)
+				.text("5M")
+				.attr("dominant-baseline", "middle");
+
+
+			z_legend.append("text")
+				.attr("x", width + z_legend_width - 80)
+				.attr("y", z_legend_height - r3 * 2)
+				.text("50M")
+				.attr("dominant-baseline", "middle");
+
+
+
+			// OPACITY LENGEND : Estimated Data
+
+			let r4 = z(5000000);
+			let op_legend_height = 350;
+			let op_legend_width = 50;
+
+			var op_legend = svg.append("g");
+
+			op_legend.append("text")
+				.text("Data estimate")
+				.attr("font-size", 20)
+				.attr("font-weight", 800)
+				.attr("transform", `translate(${width + 50}, ${op_legend_height})`);
+
+			op_legend.append("circle")
+				.attr("cx", width + op_legend_width + r4)
+				.attr("cy", op_legend_height + r4 + 20)
+				.attr("r", r4)
+				.attr('class', "popu")
+				.attr('fill', 'orange')
+				.attr('stroke', 'black')
+				.attr('opacity', 0.5);
+
+			op_legend.append("circle")
+				.attr("cx", width + op_legend_width + r4)
+				.attr("cy", op_legend_height + r4 + 50)
+				.attr("r", r4)
+				.attr('class', "popu")
+				.attr('fill', 'none')
+				.attr('stroke', 'black')
+				.style('stroke-dasharray', "5,3");
+
+			op_legend.append("circle")
+				.attr("cx", width + op_legend_width + r4)
+				.attr("cy", op_legend_height + r4 + 80)
+				.attr("r", r4)
+				.attr('class', "popu")
+				.attr('fill', 'orange')
+				.attr('stroke', 'black');
+
+			op_legend.append("text")
+				.attr("x", width + op_legend_width + r4 + 20)
+				.attr("y", op_legend_height + r4 + 20)
+				.text("estimated gini")
+				.attr("dominant-baseline", "middle");
+
+
+			op_legend.append("text")
+				.attr("x", width + op_legend_width + r4 + 20)
+				.attr("y", op_legend_height + r4 + 50)
+				.text("estimated income")
+				.attr("dominant-baseline", "middle");
+
+			op_legend.append("text")
+				.attr("x", width + op_legend_width + r4 + 20)
+				.attr("y", op_legend_height + r4 + 80)
+				.text("sourced data")
+				.attr("dominant-baseline", "middle");
 
 
 			//############# UPDATE CURSORS AND COLORS ON MOUSE HOVERING ###################
@@ -510,22 +671,32 @@
 						.attr("x2", `${x(d.population)}`);
 
 					y_cursor.select("text")
-						.attr("x", -25)
+						.attr("x", -35)
 						.attr("y", `${y(d.gini) + 5}`)
-						.text(d.gini);
+						.text(`${Number(d.gini).toPrecision(3)}`);
 
 					x_cursor.select("text")
 						.attr("x", `${x(d.population)}`)
 						.attr("y", height + 35)
 						.text(d.population);
 
-					c_cursor
-						.text(`${d.country_name}`);
+					c_cursor.select("text")
+						.text(`${d.country_name}`)
+						.attr("transform", `translate(${margin.left}, ${margin.top + 30})`);
+
+					bbox = c_cursor.select("text").node().getBBox();
+
+					c_cursor.select("rect")
+						.attr("x", bbox.x + margin.left - 5)
+						.attr("y", bbox.y + margin.top + 25)
+						.attr("width", bbox.width + 10)
+						.attr("height", bbox.height + 10);
+
+
 
 					x_cursor.style("visibility", "visible");
 					y_cursor.style("visibility", "visible");
 					c_cursor.style("visibility", "visible");
-
 				})
 				.on("mouseout", function () {
 					d3.select(this)
