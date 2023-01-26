@@ -87,10 +87,7 @@
 			let population = d3.index(datasets[0], key_iso3_year);
 			let world_4regions = d3.index(datasets[4], (d) => (d.world_4region));
 			
-
-			var year_selected = 2020;
-
-
+			
 			//Création de notre objet data contenant toutes les informations
 			var data = income.map(function (row) {
 				var newRow = row;
@@ -115,15 +112,20 @@
 				.filter(d => 'population' in d);
 
 			console.log(data);
-
-
-
+			
+			
+			
 			// dropdown years
 			let body = d3.select("body");
 			// let dropdown = body.select('h2').append('select');
 			let years = [...new Set(data.map(d => d.year))].sort(d3.descending); // collect the years from data set
+			
+			let min_years = d3.min(years);
+			let max_years = d3.max(years);
+			var year_selected = 2012;
 
-
+			
+			var income_domain = new Set(income.map((d) => Math.round(d.income)));
 			var regions_domain = new Set(datasets[4].map((d) => d.world_4region));
 			var regions_color_domain = new Set(datasets[4].map((d) => d.region_color));
 
@@ -162,7 +164,7 @@
 
 			//Population size 
 			var x = d3.scaleLog()
-				.domain([500, 2000000000])
+				.domain([100000, 2000000000])
 				.range([0, width]);
 
 			//Gini 
@@ -172,12 +174,12 @@
 
 			// Average Income (bubble size)
 			var z = d3.scaleSqrt()
-				.domain([800, 250000000])
+				.domain([d3.min(income_domain), d3.max(income_domain)])
 				.range([3, 30]);
 
 			//Permet de construire le slider
 			var years_scale = d3.scaleLinear()
-				.domain([d3.min(years), 2023])
+				.domain([min_years, max_years])
 				.range([0, width]);
 
 
@@ -235,7 +237,7 @@
 					.attr('r', (d) => 2*z(d.income))
 					.attr('opacity', (d) => {
 						if (d.is_estimate_gini == "True" || d.is_estimate_income == "True")
-							return 0.2;
+							return 0.3;
 						else
 							return 1.0;
 					});
@@ -352,7 +354,7 @@
 			var pointer = svg.append("g");
 			pointer.attr("transform", `translate(0, ${height + margin.bottom - 20})`);
 			pointer.append("circle")
-				.attr("x", `${years_scale(2020)}`)
+				.attr("x", `${years_scale(year_selected)}`)
 				.attr("r", 5)
 				.attr("fill", "grey")
 				.attr("stroke", "black")
@@ -361,7 +363,7 @@
 
 
 			svg.selectAll(".pointer").call(d3.drag().on("drag", (e) => {
-				if (Math.round(years_scale.invert(e.x)) >= 1800 && Math.round(years_scale.invert(e.x)) < 2023) {
+				if (Math.round(years_scale.invert(e.x)) >= min_years && Math.round(years_scale.invert(e.x)) < max_years) {
 					let new_year = Math.round(years_scale.invert(e.x));
 					// console.log(new_year);
 					set_year(new_year, 0);
@@ -409,7 +411,7 @@
 			function step_year() {
 				const t = d3.interval((elapsed) => {
 					year_selected = year_selected + 1;
-					if (year_selected >= 2023) year_selected = 1800;
+					if (year_selected >= max_years) year_selected = min_years;
 
 					svg.selectAll(".pointer").attr("transform", `translate(${years_scale(year_selected)},0)`);
 					set_year(year_selected, 120);
