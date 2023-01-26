@@ -8,13 +8,56 @@
 			margin: 30px 50px;
 			font-family: sans-serif;
 		}
+
+		th,
+		td {
+			padding: 10px;
+		}
+
+		table,
+		th,
+		td {
+			border-collapse: collapse;
+		}
 	</style>
 	<title>Income inequalities</title>
+
 </head>
 
 <body>
 	<h1>Income inequalities</h1>
-	<!-- <h2>Top 20 countries by GDP </h2> -->
+	<h3>Extracts of the <a href="https://wid.world/">World Inequality Database</a>.</h3>
+	<br>
+	<div>
+		<table style="border: 1px solid black;">
+			<tr>
+				<th colspan="3" style="border: 1px solid black;">
+					Data filtering by income average :
+				</th>
+			</tr>
+			<tr>
+				<td style="width:150px; ">
+					Activate filter <input type="checkbox" id="cb_filter_activated">
+				</td>
+				<td>min :</td>
+				<td><input type="number" id="input-field-min" min="4499" max="32982536" step="10000"
+						value="4499"></input>
+				</td>
+			</tr>
+
+			<tr>
+				<td></td>
+				<td>max :</td>
+				<td><input type="number" id="input-field-max" min="4499" max="32982536" step="10000"
+						value="32982536"></input>
+				</td>
+
+			</tr>
+		</table>
+
+
+		</h4>
+	</div>
 
 	<script src="../vendor/d3-7.6.1/dist/d3.js"></script>
 	<script>
@@ -117,7 +160,6 @@
 
 			// dropdown years
 			let body = d3.select("body");
-			// let dropdown = body.select('h2').append('select');
 			let years = [...new Set(data.map(d => d.year))].sort(d3.descending); // collect the years from data set
 
 			let min_years = d3.min(years);
@@ -133,6 +175,32 @@
 			var selected_regions = new Map();
 			regions_domain.forEach(element => {
 				selected_regions.set(element, true);
+			});
+
+
+			//############# Récupération du filtre sur les données income ###################
+
+
+			var income_filter_max = d3.max(income_domain);
+			var income_filter_min = d3.min(income_domain);
+			var income_filter_activated = false;
+
+			d3.select("#input-field-max").on("change", function () {
+				income_filter_max = d3.select(this).property("value");
+				set_data(year_selected,0.1);
+				console.log(income_filter_max);
+			});
+
+			d3.select("#input-field-min").on("change", function () {
+				income_filter_min = d3.select(this).property("value");
+				set_data(year_selected,0.1);
+				console.log(income_filter_min);
+			});
+
+			d3.select("#cb_filter_activated").on("change", function () {
+				income_filter_activated = d3.select(this).property("checked");
+				set_data(year_selected,0.1);
+				console.log(income_filter_activated);
 			});
 
 
@@ -276,7 +344,13 @@
 					.ease(d3.easeLinear);
 
 				var g = svg.selectAll('.bubbles')
-					.data(data.filter((d) => d.year == year))
+					.data(data.filter((d) => {
+						if (d.year != year)
+							return false;
+						else if (income_filter_activated)
+							return d.income >= income_filter_min && d.income <= income_filter_max;
+						else return true;
+					}))
 					.join('circle')
 					.attr('class', (d) => `bubbles ${d.world_4region}`)
 					.transition(t)
