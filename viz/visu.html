@@ -14,6 +14,7 @@
 
 <body>
 	<h1>Income inequalities</h1>
+	<!-- <h2>Top 20 countries by GDP </h2> -->
 
 	<script src="../vendor/d3-7.6.1/dist/d3.js"></script>
 	<script>
@@ -34,14 +35,16 @@
 			d3.tsv(`../data/new_income_averages.tsv`, d => ({
 				alpha2: d.country,
 				year: +d.year,
-				income: +d.average
+				income: +d.average,
+				is_estimate_income: d.is_estimate
 			})),
 
 			//Load gini index
 			d3.tsv(`../data/new_income_gini.tsv`, d => ({
 				alpha2: d.country,
 				year: +d.year,
-				gini: +d.gini_index
+				gini: +d.gini_index,
+				is_estimate_gini: d.is_estimate
 			})),
 
 			//Load country codes
@@ -83,6 +86,7 @@
 			let gini = d3.index(datasets[2], key_a2_year);
 			let population = d3.index(datasets[0], key_iso3_year);
 			let world_4regions = d3.index(datasets[4], (d) => (d.world_4region));
+			
 
 			var year_selected = 2020;
 
@@ -228,7 +232,13 @@
 					.attr('transform', d => `translate(${x(d.population)},${y(d.gini)})`)
 					.attr("fill", (d) => d.region_color)
 					.attr("stroke", "black")
-					.attr('r', (d) => 2*z(d.income));
+					.attr('r', (d) => 2*z(d.income))
+					.attr('opacity', (d) => {
+						if (d.is_estimate_gini == "True" || d.is_estimate_income == "True")
+							return 0.2;
+						else
+							return 1.0;
+					});
 			}
 
 
@@ -460,11 +470,13 @@
 					if (selected_regions.get(d) == true) {
 						selected_regions.set(d, false);
 						d3.selectAll(`.${d}`)
-							.attr("opacity", 0.1);
+							.style("visibility", "hidden");
+						d3.selectAll(`.regions_colors`)
+							.style("visibility", "visible");
 					} else {
 						selected_regions.set(d, true);
 						d3.selectAll(`.${d}`)
-							.attr("opacity", 1);
+							.style("visibility", "visible");
 					}
 				})
 				.style("cursor", "pointer");
